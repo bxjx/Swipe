@@ -20,6 +20,9 @@ window.Swipe = function(element, options) {
   this.callback = this.options.callback || function() {};
   this.delay = this.options.auto || 0;
 
+  // test for 3d
+  this.has3d = ('WebKitCSSMatrix' in window && 'm11' in new WebKitCSSMatrix());
+
   // reference dom elements
   this.container = element;
   this.element = this.container.children[0]; // the slide pane
@@ -52,6 +55,7 @@ window.Swipe = function(element, options) {
 Swipe.prototype = {
 
   setup: function() {
+    var boundingRect;
 
     // get and measure amt of slides
     this.slides = this.element.children;
@@ -61,7 +65,16 @@ Swipe.prototype = {
     if (this.length < 2) return null;
 
     // determine width of each slide
-    this.width = ("getBoundingClientRect" in this.container) ? this.container.getBoundingClientRect().width : this.container.offsetWidth;
+    if ("getBoundingClientRect" in this.container){
+      boundingRect = this.container.getBoundingClientRect();
+      if (boundingRect.width){
+        this.width = boundingRect.width;
+      }else{
+        this.width = boundingRect.right - boundingRect.left;
+      }
+    }else{
+      this.width = this.container.offsetWidth;
+    }
 
     // return immediately if measurement fails
     if (!this.width) return null;
@@ -69,14 +82,26 @@ Swipe.prototype = {
     // hide slider element but keep positioning during setup
     this.container.style.visibility = 'hidden';
 
-    // dynamic css
-    this.element.style.width = (this.slides.length * this.width) + 'px';
-    var index = this.slides.length;
-    while (index--) {
-      var el = this.slides[index];
-      el.style.width = this.width + 'px';
-      el.style.display = 'table-cell';
-      el.style.verticalAlign = 'top';
+    if (this.has3d){
+      // dynamic css
+      this.element.style.width = (this.slides.length * this.width) + 'px';
+      var index = this.slides.length;
+      while (index--) {
+        var el = this.slides[index];
+        el.style.width = this.width + 'px';
+        el.style.display = 'table-cell';
+        el.style.verticalAlign = 'top';
+      }
+    }else{
+      var index = this.slides.length;
+      // fallback to just hidden divs
+      while (index--) {
+        var el = this.slides[index];
+        el.style.visibility = 'hidden';
+        el.style.position = 'absolute';
+        el.style.top = '0';
+        el.style.left = '0';
+      }
     }
 
     // set start position and force translate to remove initial flickering
@@ -103,8 +128,17 @@ Swipe.prototype = {
     style.MozTransform = style.webkitTransform = 'translate3d(' + -(index * this.width) + 'px,0,0)';
     style.msTransform = style.OTransform = 'translateX(' + -(index * this.width) + 'px)';
 
+    if (!this.has3d){
+      this.slides[this.index].style.visibility = 'hidden';
+      this.slides[index].style.visibility = 'visible';
+    }
+
     // set new index to allow for expression arguments
     this.index = index;
+
+    if (!this.has3d){
+      this.transitionEnd();
+    }
 
   },
 
